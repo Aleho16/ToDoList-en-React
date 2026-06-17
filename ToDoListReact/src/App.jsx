@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Container, Form, Button, Table, Row, Col } from "react-bootstrap";
+import { Container, Form, Button, Table, Row, Col, Modal } from "react-bootstrap";
+import Notiflix from "notiflix";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 const taskSchema = z.object({
@@ -14,6 +15,8 @@ const taskSchema = z.object({
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   const {
     register,
@@ -32,13 +35,19 @@ export default function App() {
   };
 
   const onSubmit = (data) => {
-    if (editingId) {
-      setTasks(tasks.map((task) => (task.id === editingId ? { ...data, id: editingId } : task)));
-      setEditingId(null);
-    } else {
-      setTasks([...tasks, { ...data, id: Date.now() }]);
-    }
-    reset();
+    Notiflix.Loading.standard(editingId ? "Actualizando..." : "Guardando...");
+    setTimeout(() => {
+      if (editingId) {
+        setTasks(tasks.map((task) => (task.id === editingId ? { ...data, id: editingId } : task)));
+        Notiflix.Notify.success("Tarea actualizada correctamente");
+        setEditingId(null);
+      } else {
+        setTasks([...tasks, { ...data, id: Date.now() }]);
+        Notiflix.Notify.success("Tarea guardada con éxito");
+      }
+      reset();
+      Notiflix.Loading.remove();
+    }, 1500);
   };
 
   const handleEdit = (task) => {
@@ -46,6 +55,22 @@ export default function App() {
     setValue("name", task.name);
     setValue("description", task.description);
     setEditingId(task.id);
+  };
+
+  const confirmDelete = (id) => {
+    setTaskToDelete(id);
+    setShowModal(true);
+  };
+
+  const executeDelete = () => {
+    Notiflix.Loading.standard("Eliminando...");
+    setTimeout(() => {
+      setTasks(tasks.filter((task) => task.id !== taskToDelete));
+      setShowModal(false);
+      setTaskToDelete(null);
+      Notiflix.Loading.remove();
+      Notiflix.Notify.info("Tarea eliminada");
+    }, 1000);
   };
 
   const formatDate = (dateString) => {
@@ -114,8 +139,11 @@ export default function App() {
                     <td>{task.name}</td>
                     <td>{task.description || "Sin descripción"}</td>
                     <td className="text-center">
-                      <Button variant="outline-primary" size="sm" onClick={() => handleEdit(task)}>
+                      <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(task)}>
                         Editar
+                      </Button>
+                      <Button variant="outline-danger" size="sm" onClick={() => confirmDelete(task.id)}>
+                        Eliminar
                       </Button>
                     </td>
                   </tr>
@@ -125,6 +153,21 @@ export default function App() {
           </Table>
         </Col>
       </Row>
+
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Acción</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>¿Está seguro que desea eliminar el item?</Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={executeDelete}>
+            Sí, eliminar
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 }
